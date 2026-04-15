@@ -4,21 +4,20 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>DevSecOps Roadmap Tracker</title>
+  <!-- Supabase JS client -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --p1: #3b82f6;
-      --p2: #8b5cf6;
-      --p3: #ec4899;
-      --p4: #f59e0b;
-      --p5: #10b981;
       --bg: #0f172a;
       --surface: #1e293b;
       --surface2: #273549;
       --border: #334155;
       --text: #f1f5f9;
       --muted: #94a3b8;
+      --accent: #6366f1;
+      --green: #10b981;
       --radius: 12px;
     }
 
@@ -31,42 +30,153 @@
       flex-direction: column;
     }
 
+    /* ── SETUP MODAL ── */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.75);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 1000;
+      padding: 20px;
+    }
+    .modal-overlay.hidden { display: none; }
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 32px;
+      max-width: 520px;
+      width: 100%;
+    }
+    .modal h2 { font-size: 1.3rem; margin-bottom: 8px; }
+    .modal p  { color: var(--muted); font-size: 0.88rem; line-height: 1.6; margin-bottom: 20px; }
+    .modal .steps {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 18px;
+      margin-bottom: 20px;
+      font-size: 0.83rem;
+      line-height: 1.9;
+      color: var(--muted);
+    }
+    .modal .steps b { color: var(--text); }
+    .modal .steps code {
+      background: var(--surface2);
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-family: 'Menlo', monospace;
+      font-size: 0.8rem;
+      color: #a5f3fc;
+    }
+    .form-group { margin-bottom: 14px; }
+    .form-group label { display: block; font-size: 0.82rem; color: var(--muted); margin-bottom: 6px; }
+    .form-group input {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 10px 14px;
+      font-size: 0.88rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .form-group input:focus { border-color: var(--accent); }
+    .btn-primary {
+      width: 100%;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 11px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .btn-primary:hover { opacity: 0.9; }
+    .btn-primary:disabled { opacity: 0.5; cursor: default; }
+    .modal-error { color: #f87171; font-size: 0.82rem; margin-top: 10px; }
+
     /* ── HEADER ── */
     .header {
       background: linear-gradient(135deg, #1e3a8a 0%, #4c1d95 100%);
-      padding: 28px 32px;
+      padding: 24px 32px 20px;
       border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
     }
     .header-top {
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       justify-content: space-between;
       flex-wrap: wrap;
-      gap: 16px;
-      margin-bottom: 20px;
+      gap: 12px;
+      margin-bottom: 16px;
     }
-    .header h1 { font-size: 1.6rem; font-weight: 700; }
-    .header p  { color: #c4b5fd; font-size: 0.9rem; margin-top: 4px; }
-    .btn-reset {
-      background: rgba(255,255,255,0.1);
+    .header-title h1 { font-size: 1.5rem; font-weight: 700; }
+    .header-title p  { color: #c4b5fd; font-size: 0.85rem; margin-top: 3px; }
+
+    /* Auth bar */
+    .auth-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .auth-email {
+      font-size: 0.8rem;
+      color: #c4b5fd;
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .sync-status {
+      font-size: 0.75rem;
+      color: var(--green);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .sync-status.visible { opacity: 1; }
+    .btn-sm {
+      background: rgba(255,255,255,0.12);
       border: 1px solid rgba(255,255,255,0.2);
       color: #fff;
-      padding: 8px 16px;
-      border-radius: 8px;
+      padding: 6px 12px;
+      border-radius: 7px;
       cursor: pointer;
-      font-size: 0.85rem;
+      font-size: 0.78rem;
+      white-space: nowrap;
       transition: background 0.2s;
     }
-    .btn-reset:hover { background: rgba(255,255,255,0.2); }
+    .btn-sm:hover { background: rgba(255,255,255,0.22); }
 
-    .overall-bar-wrap { display: flex; align-items: center; gap: 14px; }
-    .overall-bar-wrap span { font-size: 0.85rem; color: #c4b5fd; white-space: nowrap; }
+    /* Magic link form (inline) */
+    .auth-form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .auth-form input {
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 7px;
+      color: #fff;
+      padding: 6px 12px;
+      font-size: 0.82rem;
+      outline: none;
+      width: 220px;
+    }
+    .auth-form input::placeholder { color: rgba(255,255,255,0.45); }
+    .auth-msg { font-size: 0.8rem; color: #86efac; }
+    .auth-err { font-size: 0.8rem; color: #fca5a5; }
+
+    /* Overall bar */
+    .overall-bar-wrap { display: flex; align-items: center; gap: 12px; }
+    .overall-bar-wrap > span { font-size: 0.82rem; color: #c4b5fd; white-space: nowrap; }
     .bar-track {
       flex: 1;
-      height: 10px;
+      height: 8px;
       background: rgba(255,255,255,0.15);
       border-radius: 99px;
       overflow: hidden;
+      min-width: 80px;
     }
     .bar-fill {
       height: 100%;
@@ -74,10 +184,10 @@
       background: linear-gradient(90deg, #6366f1, #10b981);
       transition: width 0.4s ease;
     }
-    .overall-pct { font-size: 1rem; font-weight: 700; white-space: nowrap; }
+    .overall-pct { font-size: 0.95rem; font-weight: 700; white-space: nowrap; }
 
     /* ── LAYOUT ── */
-    .layout { display: flex; flex: 1; overflow: hidden; }
+    .layout { display: flex; flex: 1; min-height: 0; }
 
     /* ── SIDEBAR ── */
     .sidebar {
@@ -85,11 +195,11 @@
       flex-shrink: 0;
       background: var(--surface);
       border-right: 1px solid var(--border);
-      padding: 16px 0;
+      padding: 14px 0;
       overflow-y: auto;
     }
     .sidebar-label {
-      font-size: 0.7rem;
+      font-size: 0.68rem;
       font-weight: 600;
       color: var(--muted);
       letter-spacing: 0.08em;
@@ -109,565 +219,626 @@
     }
     .phase-tab:hover { background: var(--surface2); }
     .phase-tab.active { background: var(--surface2); }
-    .phase-dot {
-      width: 10px; height: 10px;
-      border-radius: 50%;
-      flex-shrink: 0;
-    }
-    .phase-tab-text { flex: 1; font-size: 0.82rem; line-height: 1.3; }
-    .phase-tab-pct { font-size: 0.75rem; color: var(--muted); }
+    .phase-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+    .phase-tab-text { flex: 1; font-size: 0.8rem; line-height: 1.3; }
+    .phase-tab-pct { font-size: 0.73rem; color: var(--muted); }
 
     /* ── MAIN ── */
-    .main {
-      flex: 1;
-      overflow-y: auto;
-      padding: 28px 32px;
-    }
-
+    .main { flex: 1; overflow-y: auto; padding: 28px 32px; }
     .phase-panel { display: none; }
     .phase-panel.active { display: block; }
 
     .phase-header {
-      display: flex;
-      align-items: flex-start;
-      gap: 16px;
-      margin-bottom: 24px;
-      padding-bottom: 20px;
+      display: flex; align-items: flex-start; gap: 14px;
+      margin-bottom: 22px; padding-bottom: 18px;
       border-bottom: 1px solid var(--border);
     }
-    .phase-icon { font-size: 2.2rem; }
+    .phase-icon { font-size: 2rem; }
     .phase-header-info { flex: 1; }
-    .phase-title { font-size: 1.4rem; font-weight: 700; margin-bottom: 4px; }
-    .phase-meta { color: var(--muted); font-size: 0.85rem; }
+    .phase-title { font-size: 1.3rem; font-weight: 700; margin-bottom: 3px; }
+    .phase-meta  { color: var(--muted); font-size: 0.83rem; }
     .phase-badge {
-      padding: 6px 14px;
-      border-radius: 99px;
-      font-size: 0.8rem;
-      font-weight: 700;
-      background: rgba(16,185,129,0.15);
-      color: #10b981;
+      padding: 5px 12px; border-radius: 99px;
+      font-size: 0.78rem; font-weight: 700;
+      background: rgba(16,185,129,0.15); color: var(--green);
       border: 1px solid rgba(16,185,129,0.3);
-      white-space: nowrap;
-      display: none;
+      white-space: nowrap; display: none;
     }
     .phase-badge.show { display: inline-block; }
 
-    /* phase progress */
     .phase-progress {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 16px 20px;
-      margin-bottom: 24px;
-      display: flex;
-      align-items: center;
-      gap: 16px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 14px 18px;
+      margin-bottom: 20px; display: flex; align-items: center; gap: 16px;
     }
     .phase-progress-info { flex: 1; }
-    .phase-progress-info .pct-label { font-size: 0.85rem; color: var(--muted); margin-bottom: 8px; }
-    .phase-pct-num { font-size: 1.6rem; font-weight: 700; }
-    .phase-bar-track {
-      flex: 3;
-      height: 8px;
-      background: var(--border);
-      border-radius: 99px;
-      overflow: hidden;
-    }
-    .phase-bar-fill {
-      height: 100%;
-      border-radius: 99px;
-      transition: width 0.4s ease;
-    }
+    .phase-progress-info .pct-label { font-size: 0.82rem; color: var(--muted); margin-bottom: 6px; }
+    .phase-pct-num { font-size: 1.5rem; font-weight: 700; }
+    .phase-bar-track { flex: 3; height: 7px; background: var(--border); border-radius: 99px; overflow: hidden; }
+    .phase-bar-fill  { height: 100%; border-radius: 99px; transition: width 0.4s ease; }
 
-    /* ── WEEK SECTION ── */
+    /* ── WEEK ── */
     .week-section {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      margin-bottom: 16px;
-      overflow: hidden;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); margin-bottom: 12px; overflow: hidden;
     }
     .week-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 14px 18px;
-      cursor: pointer;
-      user-select: none;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 13px 16px; cursor: pointer; user-select: none;
       transition: background 0.15s;
     }
     .week-header:hover { background: var(--surface2); }
-    .week-header-left { display: flex; align-items: center; gap: 10px; }
-    .week-label { font-weight: 600; font-size: 0.95rem; }
-    .week-tasks-count { font-size: 0.78rem; color: var(--muted); }
-    .week-mini-bar {
-      width: 80px;
-      height: 5px;
-      background: var(--border);
-      border-radius: 99px;
-      overflow: hidden;
-    }
-    .week-mini-fill {
-      height: 100%;
-      border-radius: 99px;
-      transition: width 0.3s;
-    }
-    .week-chevron { color: var(--muted); font-size: 0.85rem; transition: transform 0.2s; }
+    .week-header-left { display: flex; align-items: center; gap: 9px; }
+    .week-label { font-weight: 600; font-size: 0.9rem; }
+    .week-tasks-count { font-size: 0.76rem; color: var(--muted); }
+    .week-mini-bar { width: 70px; height: 4px; background: var(--border); border-radius: 99px; overflow: hidden; }
+    .week-mini-fill { height: 100%; border-radius: 99px; transition: width 0.3s; }
+    .week-chevron { color: var(--muted); font-size: 0.8rem; transition: transform 0.2s; }
     .week-section.open .week-chevron { transform: rotate(180deg); }
-
-    .week-body { display: none; padding: 4px 18px 14px; }
+    .week-body { display: none; padding: 2px 16px 12px; }
     .week-section.open .week-body { display: block; }
 
     /* ── TASK ── */
     .task-item {
-      display: flex;
-      align-items: flex-start;
-      gap: 10px;
-      padding: 8px 6px;
-      border-radius: 6px;
-      transition: background 0.12s;
-      cursor: pointer;
+      display: flex; align-items: flex-start; gap: 9px;
+      padding: 7px 5px; border-radius: 6px;
+      transition: background 0.12s; cursor: pointer;
     }
     .task-item:hover { background: var(--surface2); }
     .task-item input[type="checkbox"] {
-      width: 16px;
-      height: 16px;
-      margin-top: 2px;
-      flex-shrink: 0;
-      accent-color: #6366f1;
-      cursor: pointer;
+      width: 15px; height: 15px; margin-top: 3px;
+      flex-shrink: 0; accent-color: var(--accent); cursor: pointer;
     }
-    .task-label {
-      font-size: 0.88rem;
-      line-height: 1.5;
-      color: var(--text);
-      transition: color 0.2s;
-      cursor: pointer;
-    }
-    .task-item.done .task-label {
-      text-decoration: line-through;
-      color: var(--muted);
-    }
+    .task-label { font-size: 0.86rem; line-height: 1.5; color: var(--text); cursor: pointer; }
+    .task-item.done .task-label { text-decoration: line-through; color: var(--muted); }
 
-    /* cert badge */
+    /* cert card */
     .cert-card {
       background: linear-gradient(135deg, var(--surface2), var(--surface));
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 14px 18px;
-      margin-top: 20px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
+      border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 12px 16px; margin-top: 18px;
+      display: flex; align-items: center; gap: 12px;
     }
-    .cert-card .cert-icon { font-size: 1.6rem; }
-    .cert-card .cert-info { font-size: 0.85rem; }
+    .cert-card .cert-icon { font-size: 1.5rem; }
+    .cert-card .cert-info { font-size: 0.83rem; }
     .cert-card .cert-name { font-weight: 600; margin-bottom: 2px; }
     .cert-card .cert-meta { color: var(--muted); }
 
-    /* ── RESPONSIVE ── */
     @media (max-width: 700px) {
       .layout { flex-direction: column; }
-      .sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--border); padding: 10px 0; }
-      .phase-tab { padding: 8px 14px; }
-      .main { padding: 20px 16px; }
-      .overall-pct { font-size: 0.9rem; }
+      .sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--border); padding: 8px 0; }
+      .main { padding: 18px 14px; }
+      .auth-form input { width: 160px; }
     }
   </style>
 </head>
 <body>
 
-<div class="header">
-  <div class="header-top">
-    <div>
-      <h1>🧭 DevSecOps Roadmap Tracker</h1>
-      <p>Backend Engineer · 6-9 months · Production-grade system</p>
+<!-- ══ SETUP MODAL ══════════════════════════════════════════ -->
+<div class="modal-overlay hidden" id="setup-modal">
+  <div class="modal">
+    <h2>🔧 Connect Supabase</h2>
+    <p>Enter your Supabase project credentials to sync progress across devices. Run the SQL below in your Supabase SQL Editor first.</p>
+
+    <div class="steps">
+      <b>1.</b> Go to <code>supabase.com/dashboard</code> → New Project<br>
+      <b>2.</b> Open <b>SQL Editor</b> and run:<br><br>
+<pre style="background:var(--bg);padding:10px;border-radius:6px;font-size:0.78rem;color:#86efac;overflow-x:auto">
+CREATE TABLE public.progress (
+  user_id UUID REFERENCES auth.users(id)
+    ON DELETE CASCADE PRIMARY KEY,
+  data    JSONB NOT NULL DEFAULT '{}',
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE public.progress ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "own_progress" ON public.progress
+  FOR ALL USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+</pre>
+      <br><b>3.</b> Settings → API → copy <b>Project URL</b> and <b>anon key</b><br>
+      <b>4.</b> Authentication → <b>Email</b> → enable <b>Magic Link</b>
     </div>
-    <button class="btn-reset" onclick="resetAll()">Reset Progress</button>
-  </div>
-  <div class="overall-bar-wrap">
-    <span>Overall Progress</span>
-    <div class="bar-track"><div class="bar-fill" id="overall-fill" style="width:0%"></div></div>
-    <span class="overall-pct" id="overall-pct">0%</span>
+
+    <div class="form-group">
+      <label>Supabase Project URL</label>
+      <input id="sb-url" type="url" placeholder="https://xxxxxxxxxxxx.supabase.co" />
+    </div>
+    <div class="form-group">
+      <label>Supabase Anon Key</label>
+      <input id="sb-key" type="text" placeholder="eyJhbGciOiJIUzI1NiIs..." />
+    </div>
+    <button class="btn-primary" id="btn-save-config">Connect →</button>
+    <div class="modal-error hidden" id="setup-error"></div>
   </div>
 </div>
 
+<!-- ══ HEADER ═══════════════════════════════════════════════ -->
+<div class="header">
+  <div class="header-top">
+    <div class="header-title">
+      <h1>🧭 DevSecOps Roadmap Tracker</h1>
+      <p>Backend Engineer · 6-9 months · Production-grade system</p>
+    </div>
+
+    <!-- Auth bar -->
+    <div class="auth-bar" id="auth-bar">
+      <!-- injected by JS -->
+    </div>
+  </div>
+
+  <div class="overall-bar-wrap">
+    <span>Overall</span>
+    <div class="bar-track"><div class="bar-fill" id="overall-fill" style="width:0%"></div></div>
+    <span class="overall-pct" id="overall-pct">0%</span>
+    <span class="sync-status" id="sync-status">Synced ✓</span>
+  </div>
+</div>
+
+<!-- ══ LAYOUT ════════════════════════════════════════════════ -->
 <div class="layout">
-  <!-- SIDEBAR -->
   <nav class="sidebar" id="sidebar">
     <div class="sidebar-label">Phases</div>
   </nav>
-
-  <!-- MAIN CONTENT -->
   <main class="main" id="main-content"></main>
 </div>
 
 <script>
-// ─────────────────────────────────────────────
+// ═══════════════════════════════════════════
 //  ROADMAP DATA
-// ─────────────────────────────────────────────
+// ═══════════════════════════════════════════
 const PHASES = [
   {
-    id: 'p1',
-    icon: '☁️',
+    id: 'p1', icon: '☁️',
     title: 'Phase 1: AWS Foundation',
     meta: '1.5–2 months  ·  AWS SAA-C03',
     color: '#3b82f6',
     cert: { name: 'AWS Solutions Architect – Associate (SAA-C03)', icon: '🏅', meta: 'Exam: 130 min · $150 · Pass: 720/1000' },
     weeks: [
-      {
-        label: 'Week 1 – Cloud Fundamentals + Networking',
-        tasks: [
-          'Cloud Computing 101: understand IaaS / PaaS / SaaS (AWS Skill Builder)',
-          'Networking basics: TCP/IP, HTTP/HTTPS, DNS (NetworkChuck YouTube)',
-          'TLS/SSL: certificate chain, TLS handshake process',
-          'Draw a network diagram: browser → DNS → server → database',
-        ]
-      },
-      {
-        label: 'Week 2 – AWS Core Services',
-        tasks: [
-          'Launch EC2 instance with SSH in < 5 minutes',
-          'Create custom VPC (CIDR, public + private subnets, Internet Gateway)',
-          'Configure NAT Gateway for private subnet internet access',
-          'Set up route tables (public → IGW, private → NAT)',
-          'Create RDS PostgreSQL instance in private subnet',
-          'Create IAM user + policy (least-privilege S3 access)',
-          'Configure security groups: ALB, App Server, RDS',
-        ]
-      },
-      {
-        label: 'Week 3 – Docker Fundamentals',
-        tasks: [
-          'Install Docker locally',
-          'Run hello-world container',
-          'Write Dockerfile for Node.js app (non-root user + HEALTHCHECK)',
-          'Build image: docker build -t my-app:1.0 .',
-          'Write docker-compose.yml (app + PostgreSQL)',
-          'Run: docker-compose up -d',
-          'Check logs: docker-compose logs -f app',
-          'Stop: docker-compose down',
-        ]
-      },
-      {
-        label: 'Week 4 – Project 1.1: 3-Tier Architecture (AWS Console)',
-        tasks: [
-          'Create VPC (10.0.0.0/16) with 2 public subnets (diff AZs)',
-          'Create 2 private subnets in different AZs',
-          'Attach Internet Gateway; configure NAT Gateways per AZ',
-          'Create route tables for public (→ IGW) and private (→ NAT)',
-          'Create ALB Security Group: inbound HTTP/443 from 0.0.0.0/0',
-          'Create App Security Group: inbound 3000 from ALB SG only',
-          'Create RDS Security Group: inbound 5432 from App SG only',
-          'Create RDS PostgreSQL (db.t3.micro, Multi-AZ, encrypted, 7-day backup)',
-          'Launch 2 EC2 instances (private subnet, different AZs)',
-          'Deploy backend app to both EC2 instances via User Data script',
-          'Create ALB + target group with GET /health check',
-          'Register EC2 instances to target group',
-          'Test: access app via ALB DNS from browser',
-          'Test: stop one EC2, verify traffic routes to other',
-          'Verify: no public access to RDS',
-        ]
-      },
-      {
-        label: 'Week 5–7 – Project 1.2: Docker + AWS SAA Exam',
-        tasks: [
-          'Write production Dockerfile (Alpine, non-root, health check)',
-          'Write docker-compose.yml for local full-stack dev',
-          'Test: build, run, health check, DB connection',
-          'Commit Dockerfile + docker-compose.yml to git',
-          'Complete AWS SAA course (Udemy – all sections)',
-          'Take Practice Exam 1 (score ≥ 75%)',
-          'Take Practice Exam 2 (score ≥ 75%)',
-          'Take Practice Exam 3 (score ≥ 75%)',
-          'Review weak areas (VPC, RDS, IAM, S3, ELB)',
-          '🏅 Pass AWS SAA exam (720+/1000)',
-        ]
-      },
+      { label: 'Week 1 – Cloud Fundamentals + Networking', tasks: [
+        'Cloud Computing 101: understand IaaS / PaaS / SaaS (AWS Skill Builder)',
+        'Networking basics: TCP/IP, HTTP/HTTPS, DNS (NetworkChuck YouTube)',
+        'TLS/SSL: certificate chain, TLS handshake process',
+        'Draw a network diagram: browser → DNS → server → database',
+      ]},
+      { label: 'Week 2 – AWS Core Services', tasks: [
+        'Launch EC2 instance with SSH in < 5 minutes',
+        'Create custom VPC (CIDR, public + private subnets, Internet Gateway)',
+        'Configure NAT Gateway for private subnet internet access',
+        'Set up route tables (public → IGW, private → NAT)',
+        'Create RDS PostgreSQL instance in private subnet',
+        'Create IAM user + policy (least-privilege S3 access)',
+        'Configure security groups: ALB, App Server, RDS',
+      ]},
+      { label: 'Week 3 – Docker Fundamentals', tasks: [
+        'Install Docker locally',
+        'Run hello-world container',
+        'Write Dockerfile for Node.js app (non-root user + HEALTHCHECK)',
+        'Build image: docker build -t my-app:1.0 .',
+        'Write docker-compose.yml (app + PostgreSQL)',
+        'Run: docker-compose up -d',
+        'Check logs: docker-compose logs -f app',
+        'Stop: docker-compose down',
+      ]},
+      { label: 'Week 4 – Project 1.1: 3-Tier Architecture (AWS Console)', tasks: [
+        'Create VPC (10.0.0.0/16) with 2 public subnets (diff AZs)',
+        'Create 2 private subnets in different AZs',
+        'Attach Internet Gateway; configure NAT Gateways per AZ',
+        'Create route tables: public → IGW, private → NAT',
+        'Create ALB Security Group: inbound HTTP/443 from 0.0.0.0/0',
+        'Create App Security Group: inbound 3000 from ALB SG only',
+        'Create RDS Security Group: inbound 5432 from App SG only',
+        'Create RDS PostgreSQL (db.t3.micro, Multi-AZ, encrypted, 7-day backup)',
+        'Launch 2 EC2 instances (private subnet, different AZs)',
+        'Deploy backend app to both EC2 instances via User Data script',
+        'Create ALB + target group with GET /health check',
+        'Register EC2 instances to target group',
+        'Test: access app via ALB DNS from browser',
+        'Test: stop one EC2, verify traffic routes to other',
+        'Verify: no public access to RDS',
+      ]},
+      { label: 'Week 5–7 – Project 1.2: Docker + AWS SAA Exam', tasks: [
+        'Write production Dockerfile (Alpine, non-root, health check)',
+        'Write docker-compose.yml for local full-stack dev',
+        'Test: build, run, health check, DB connection',
+        'Commit Dockerfile + docker-compose.yml to git',
+        'Complete AWS SAA course (Udemy – all sections)',
+        'Take Practice Exam 1 (score ≥ 75%)',
+        'Take Practice Exam 2 (score ≥ 75%)',
+        'Take Practice Exam 3 (score ≥ 75%)',
+        'Review weak areas (VPC, RDS, IAM, S3, ELB)',
+        '🏅 Pass AWS SAA exam (720+/1000)',
+      ]},
     ]
   },
   {
-    id: 'p2',
-    icon: '🏗️',
+    id: 'p2', icon: '🏗️',
     title: 'Phase 2: Terraform + CI/CD',
     meta: '2 months  ·  HashiCorp Terraform Associate (optional)',
     color: '#8b5cf6',
     cert: { name: 'HashiCorp Terraform Associate (optional)', icon: '📜', meta: 'Infrastructure as Code certification' },
     weeks: [
-      {
-        label: 'Week 1 – Terraform Fundamentals',
-        tasks: [
-          'Install Terraform locally',
-          'Learn HCL syntax: variables, outputs, locals',
-          'Understand state management (.tfstate)',
-          'Write simple VPC + subnet Terraform (local state)',
-          'Run: terraform init, plan, apply, destroy',
-          'Examine terraform.tfstate file structure',
-        ]
-      },
-      {
-        label: 'Week 2 – Remote State + Modules',
-        tasks: [
-          'Create S3 bucket for Terraform remote state',
-          'Create DynamoDB table for state locking',
-          'Configure backend.tf (S3 + DynamoDB)',
-          'Migrate local state to S3 backend',
-          'Write VPC module (main.tf, variables.tf, outputs.tf)',
-          'Write EC2 module',
-          'Write RDS module',
-          'Test: terraform init, plan, apply with modules',
-        ]
-      },
-      {
-        label: 'Week 3 – Multi-Environment Setup',
-        tasks: [
-          'Create environments/dev/ with terraform.tfvars',
-          'Create environments/staging/ with terraform.tfvars',
-          'Create environments/prod/ with terraform.tfvars',
-          'Deploy dev: t3.micro, 1 instance, no backups',
-          'Deploy staging: medium instances, 7-day backups',
-          'Verify prod config: larger instances, Multi-AZ, 30-day backups',
-        ]
-      },
-      {
-        label: 'Week 4–5 – Project 2.1: Refactor Phase 1 to Terraform',
-        tasks: [
-          'Write VPC module (IGW, NAT gateways, route tables)',
-          'Write EC2 Auto Scaling module (launch template + ASG)',
-          'Write RDS module (subnet group, PostgreSQL instance)',
-          'Write ALB module (target group, listener, health check)',
-          'Compose root main.tf using all modules',
-          'Deploy full 3-tier stack via Terraform',
-          'Verify: terraform plan returns no diff after deploy',
-          'Run terraform destroy and re-apply from scratch',
-        ]
-      },
-      {
-        label: 'Week 6–8 – Project 2.2: GitHub Actions CI/CD',
-        tasks: [
-          'Create GitHub Actions workflow: build + test on push',
-          'Add terraform fmt + validate on PR',
-          'Add terraform plan on Pull Request (post plan as comment)',
-          'Configure GitHub Secrets: AWS credentials per environment',
-          'Automated deployment to dev on merge to main',
-          'Add manual approval gate before prod deployment',
-          'Test full pipeline: PR → plan → merge → deploy to dev',
-          'Document CI/CD architecture and secrets setup',
-        ]
-      },
+      { label: 'Week 1 – Terraform Fundamentals', tasks: [
+        'Install Terraform locally',
+        'Learn HCL syntax: variables, outputs, locals',
+        'Understand state management (.tfstate)',
+        'Write simple VPC + subnet Terraform (local state)',
+        'Run: terraform init, plan, apply, destroy',
+        'Examine terraform.tfstate file structure',
+      ]},
+      { label: 'Week 2 – Remote State + Modules', tasks: [
+        'Create S3 bucket for Terraform remote state',
+        'Create DynamoDB table for state locking',
+        'Configure backend.tf (S3 + DynamoDB)',
+        'Migrate local state to S3 backend',
+        'Write VPC module (main.tf, variables.tf, outputs.tf)',
+        'Write EC2 module',
+        'Write RDS module',
+        'Test: terraform init, plan, apply with modules',
+      ]},
+      { label: 'Week 3 – Multi-Environment Setup', tasks: [
+        'Create environments/dev/ with terraform.tfvars',
+        'Create environments/staging/ with terraform.tfvars',
+        'Create environments/prod/ with terraform.tfvars',
+        'Deploy dev: t3.micro, 1 instance, no backups',
+        'Deploy staging: medium instances, 7-day backups',
+        'Verify prod config: larger instances, Multi-AZ, 30-day backups',
+      ]},
+      { label: 'Week 4–5 – Project 2.1: Refactor Phase 1 to Terraform', tasks: [
+        'Write VPC module (IGW, NAT gateways, route tables)',
+        'Write EC2 Auto Scaling module (launch template + ASG)',
+        'Write RDS module (subnet group, PostgreSQL instance)',
+        'Write ALB module (target group, listener, health check)',
+        'Compose root main.tf using all modules',
+        'Deploy full 3-tier stack via Terraform',
+        'Verify: terraform plan returns no diff after deploy',
+        'Run terraform destroy and re-apply from scratch',
+      ]},
+      { label: 'Week 6–8 – Project 2.2: GitHub Actions CI/CD', tasks: [
+        'Create GitHub Actions workflow: build + test on push',
+        'Add terraform fmt + validate on PR',
+        'Add terraform plan on Pull Request (post plan as comment)',
+        'Configure GitHub Secrets: AWS credentials per environment',
+        'Automated deployment to dev on merge to main',
+        'Add manual approval gate before prod deployment',
+        'Test full pipeline: PR → plan → merge → deploy to dev',
+        'Document CI/CD architecture and secrets setup',
+      ]},
     ]
   },
   {
-    id: 'p3',
-    icon: '☸️',
+    id: 'p3', icon: '☸️',
     title: 'Phase 3: Kubernetes',
     meta: '2 months  ·  CKA or CKAD (optional)',
     color: '#ec4899',
     cert: { name: 'CKA or CKAD (optional)', icon: '📜', meta: 'Certified Kubernetes Administrator / Application Developer' },
     weeks: [
-      {
-        label: 'Week 1–2 – K8s Fundamentals',
-        tasks: [
-          'Learn core concepts: Pods, Deployments, ReplicaSets, Services',
-          'Learn: ConfigMaps, Secrets, Namespaces, RBAC basics',
-          'Install kubectl',
-          'Set up local cluster (kind or minikube)',
-          'Deploy app to local cluster',
-          'Expose app via Service (ClusterIP, NodePort, LoadBalancer)',
-          'Understand liveness and readiness probes',
-        ]
-      },
-      {
-        label: 'Week 3–4 – EKS Setup',
-        tasks: [
-          'Create EKS cluster with Terraform (terraform-aws-eks module)',
-          'Configure kubeconfig for EKS access',
-          'Deploy app to EKS cluster',
-          'Expose via LoadBalancer service (AWS NLB/ALB)',
-          'Configure IAM Roles for Service Accounts (IRSA)',
-          'Set up cluster autoscaler',
-        ]
-      },
-      {
-        label: 'Week 5–6 – Helm + Ingress + TLS',
-        tasks: [
-          'Install Helm',
-          'Create Helm chart for the app (templates, values.yaml)',
-          'Install NGINX Ingress Controller via Helm',
-          'Configure Ingress resource with routing rules',
-          'Install cert-manager via Helm',
-          'Configure ClusterIssuer for Let\'s Encrypt',
-          'Enable TLS on Ingress (automatic certificate)',
-        ]
-      },
-      {
-        label: 'Week 7–8 – Project 3: Production K8s',
-        tasks: [
-          'Deploy full stack to EKS via Helm',
-          'Configure HPA (Horizontal Pod Autoscaler) based on CPU/memory',
-          'Install kube-prometheus-stack (Prometheus + Grafana)',
-          'Create Grafana dashboards for app metrics',
-          'Set up Loki or CloudWatch for cluster logging',
-          'Run load test (k6 or hey) and verify autoscaling works',
-          'Document K8s architecture and runbook',
-        ]
-      },
+      { label: 'Week 1–2 – K8s Fundamentals', tasks: [
+        'Learn core concepts: Pods, Deployments, ReplicaSets, Services',
+        'Learn: ConfigMaps, Secrets, Namespaces, RBAC basics',
+        'Install kubectl',
+        'Set up local cluster (kind or minikube)',
+        'Deploy app to local cluster',
+        'Expose app via Service (ClusterIP, NodePort, LoadBalancer)',
+        'Understand liveness and readiness probes',
+      ]},
+      { label: 'Week 3–4 – EKS Setup', tasks: [
+        'Create EKS cluster with Terraform (terraform-aws-eks module)',
+        'Configure kubeconfig for EKS access',
+        'Deploy app to EKS cluster',
+        'Expose via LoadBalancer service (AWS NLB/ALB)',
+        'Configure IAM Roles for Service Accounts (IRSA)',
+        'Set up cluster autoscaler',
+      ]},
+      { label: 'Week 5–6 – Helm + Ingress + TLS', tasks: [
+        'Install Helm',
+        'Create Helm chart for the app (templates, values.yaml)',
+        'Install NGINX Ingress Controller via Helm',
+        'Configure Ingress resource with routing rules',
+        'Install cert-manager via Helm',
+        "Configure ClusterIssuer for Let's Encrypt",
+        'Enable TLS on Ingress (automatic certificate)',
+      ]},
+      { label: 'Week 7–8 – Project 3: Production K8s', tasks: [
+        'Deploy full stack to EKS via Helm',
+        'Configure HPA (Horizontal Pod Autoscaler) based on CPU/memory',
+        'Install kube-prometheus-stack (Prometheus + Grafana)',
+        'Create Grafana dashboards for app metrics',
+        'Set up Loki or CloudWatch for cluster logging',
+        'Run load test (k6 or hey) and verify autoscaling works',
+        'Document K8s architecture and runbook',
+      ]},
     ]
   },
   {
-    id: 'p4',
-    icon: '🔒',
+    id: 'p4', icon: '🔒',
     title: 'Phase 4: Security Foundation',
     meta: '1.5–2 months  ·  AWS Security Specialty (optional)',
     color: '#f59e0b',
     cert: { name: 'AWS Security Specialty (optional)', icon: '🔐', meta: 'Advanced cloud security certification' },
     weeks: [
-      {
-        label: 'Week 1–2 – OWASP + SAST',
-        tasks: [
-          'Study OWASP Top 10 vulnerabilities',
-          'Run Trivy for container image vulnerability scanning',
-          'Run Snyk for dependency / SCA scanning',
-          'Integrate SonarCloud (or SonarQube) for SAST',
-          'Fix identified vulnerabilities in the app',
-          'Document findings and remediation steps',
-        ]
-      },
-      {
-        label: 'Week 3–4 – Secrets Management',
-        tasks: [
-          'Audit codebase for hardcoded secrets',
-          'Migrate secrets to AWS Secrets Manager',
-          'Configure app to read secrets from Secrets Manager at runtime',
-          'Learn HashiCorp Vault basics (KV store, dynamic secrets)',
-          'Implement automatic secret rotation in AWS Secrets Manager',
-          'Configure Kubernetes Secrets encryption at rest (EKS)',
-        ]
-      },
-      {
-        label: 'Week 5–6 – Network Security',
-        tasks: [
-          'Configure AWS WAF with managed rule groups',
-          'Audit and harden all security groups (least privilege)',
-          'Enable AWS Shield Standard (DDoS protection)',
-          'Enable VPC Flow Logs and analyze traffic patterns',
-          'Enable GuardDuty for threat detection',
-          'Review and fix IAM privilege escalation paths',
-        ]
-      },
-      {
-        label: 'Week 7–8 – Project 4: Security Pipeline',
-        tasks: [
-          'Add Trivy scan step to GitHub Actions CI/CD',
-          'Add OWASP ZAP DAST scan against staging environment',
-          'Add dependency check (Snyk or OWASP Dependency-Check)',
-          'Configure security gate: block deploy if critical vulns found',
-          'Set up AWS Config rules for compliance checks',
-          'Build CloudWatch security dashboard with alerts',
-          'Generate automated security report',
-        ]
-      },
+      { label: 'Week 1–2 – OWASP + SAST', tasks: [
+        'Study OWASP Top 10 vulnerabilities',
+        'Run Trivy for container image vulnerability scanning',
+        'Run Snyk for dependency / SCA scanning',
+        'Integrate SonarCloud (or SonarQube) for SAST',
+        'Fix identified vulnerabilities in the app',
+        'Document findings and remediation steps',
+      ]},
+      { label: 'Week 3–4 – Secrets Management', tasks: [
+        'Audit codebase for hardcoded secrets',
+        'Migrate secrets to AWS Secrets Manager',
+        'Configure app to read secrets from Secrets Manager at runtime',
+        'Learn HashiCorp Vault basics (KV store, dynamic secrets)',
+        'Implement automatic secret rotation in AWS Secrets Manager',
+        'Configure Kubernetes Secrets encryption at rest (EKS)',
+      ]},
+      { label: 'Week 5–6 – Network Security', tasks: [
+        'Configure AWS WAF with managed rule groups',
+        'Audit and harden all security groups (least privilege)',
+        'Enable AWS Shield Standard (DDoS protection)',
+        'Enable VPC Flow Logs and analyze traffic patterns',
+        'Enable GuardDuty for threat detection',
+        'Review and fix IAM privilege escalation paths',
+      ]},
+      { label: 'Week 7–8 – Project 4: Security Pipeline', tasks: [
+        'Add Trivy scan step to GitHub Actions CI/CD',
+        'Add OWASP ZAP DAST scan against staging environment',
+        'Add dependency check (Snyk or OWASP Dependency-Check)',
+        'Configure security gate: block deploy if critical vulns found',
+        'Set up AWS Config rules for compliance checks',
+        'Build CloudWatch security dashboard with alerts',
+        'Generate automated security report',
+      ]},
     ]
   },
   {
-    id: 'p5',
-    icon: '🚀',
+    id: 'p5', icon: '🚀',
     title: 'Phase 5: DevSecOps Integration',
     meta: '1 month  ·  Final Capstone Project',
     color: '#10b981',
     cert: { name: 'Portfolio Project Complete', icon: '🎓', meta: 'Full DevSecOps pipeline production deployment' },
     weeks: [
-      {
-        label: 'Week 1–2 – Full Pipeline Integration',
-        tasks: [
-          'Design complete DevSecOps pipeline architecture diagram',
-          'Integrate: Terraform + EKS + Helm + GitHub Actions + Security scanning',
-          'CI pipeline stages: lint → test → SAST → build image → Trivy scan',
-          'CD pipeline stages: terraform plan → approve → deploy → DAST → smoke test',
-          'Configure environment promotion: dev → staging → prod',
-          'Add rollback mechanism on failed health checks',
-        ]
-      },
-      {
-        label: 'Week 3–4 – Production Deployment + Docs',
-        tasks: [
-          'Deploy full system to production environment',
-          'Set up PagerDuty or OpsGenie alerting (on-call runbook)',
-          'Write Incident Response runbook',
-          'Configure SLOs and error budgets in Grafana',
-          'Write Architecture Documentation (ADRs)',
-          'Record demo video of full CI/CD pipeline run',
-          '🎓 Prepare portfolio presentation (GitHub README + slides)',
-        ]
-      },
+      { label: 'Week 1–2 – Full Pipeline Integration', tasks: [
+        'Design complete DevSecOps pipeline architecture diagram',
+        'Integrate: Terraform + EKS + Helm + GitHub Actions + Security scanning',
+        'CI stages: lint → test → SAST → build image → Trivy scan',
+        'CD stages: terraform plan → approve → deploy → DAST → smoke test',
+        'Configure environment promotion: dev → staging → prod',
+        'Add rollback mechanism on failed health checks',
+      ]},
+      { label: 'Week 3–4 – Production Deployment + Docs', tasks: [
+        'Deploy full system to production environment',
+        'Set up PagerDuty or OpsGenie alerting (on-call runbook)',
+        'Write Incident Response runbook',
+        'Configure SLOs and error budgets in Grafana',
+        'Write Architecture Documentation (ADRs)',
+        'Record demo video of full CI/CD pipeline run',
+        '🎓 Prepare portfolio presentation (GitHub README + slides)',
+      ]},
     ]
   },
 ];
 
-// ─────────────────────────────────────────────
-//  STATE (localStorage)
-// ─────────────────────────────────────────────
-const STORAGE_KEY = 'devsecops-tracker-v1';
+// ═══════════════════════════════════════════
+//  SUPABASE CONFIG
+// ═══════════════════════════════════════════
+const SB_CONFIG_KEY = 'supabase-config';
+const STORAGE_KEY   = 'devsecops-tracker-v1';
 
-function loadState() {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
-  catch { return {}; }
+let sb = null;           // Supabase client
+let currentUser = null;  // logged-in user
+let syncTimer   = null;
+
+function getConfig() {
+  try { return JSON.parse(localStorage.getItem(SB_CONFIG_KEY)) || null; }
+  catch { return null; }
 }
-function saveState(state) {
+
+function initSupabase(url, key) {
+  sb = window.supabase.createClient(url, key);
+
+  sb.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+      currentUser = session.user;
+      await pullProgress();
+      renderAuthBar();
+      init();
+    } else if (event === 'SIGNED_OUT') {
+      currentUser = null;
+      renderAuthBar();
+    }
+  });
+
+  // Restore session on page load
+  sb.auth.getSession().then(({ data: { session } }) => {
+    if (session) {
+      currentUser = session.user;
+      pullProgress().then(() => { renderAuthBar(); init(); });
+    } else {
+      renderAuthBar();
+    }
+  });
+}
+
+// Pull progress from Supabase → overwrite local state
+async function pullProgress() {
+  if (!sb || !currentUser) return;
+  const { data, error } = await sb
+    .from('progress')
+    .select('data')
+    .eq('user_id', currentUser.id)
+    .maybeSingle();
+  if (error) { console.error('pull error', error); return; }
+  if (data?.data) {
+    state = data.data;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+}
+
+// Push progress to Supabase (debounced 1 s)
+function pushProgress() {
+  if (!sb || !currentUser) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(async () => {
+    const { error } = await sb.from('progress').upsert({
+      user_id: currentUser.id,
+      data: state,
+      updated_at: new Date().toISOString()
+    });
+    if (!error) flashSync();
+  }, 1000);
+}
+
+function flashSync() {
+  const el = document.getElementById('sync-status');
+  if (!el) return;
+  el.classList.add('visible');
+  setTimeout(() => el.classList.remove('visible'), 2500);
+}
+
+// ═══════════════════════════════════════════
+//  AUTH UI
+// ═══════════════════════════════════════════
+function renderAuthBar() {
+  const bar = document.getElementById('auth-bar');
+  if (!bar) return;
+
+  if (!sb) {
+    // Supabase not configured
+    bar.innerHTML = `<button class="btn-sm" onclick="openSetup()">⚙ Connect Supabase</button>`;
+    return;
+  }
+
+  if (currentUser) {
+    // Signed in
+    bar.innerHTML = `
+      <span class="auth-email">📧 ${currentUser.email}</span>
+      <button class="btn-sm" onclick="doSignOut()">Sign out</button>
+    `;
+  } else {
+    // Not signed in — show magic link form
+    bar.innerHTML = `
+      <div class="auth-form">
+        <input id="auth-email-input" type="email" placeholder="your@email.com" />
+        <button class="btn-sm" onclick="doSignIn()">Send magic link</button>
+      </div>
+      <span class="auth-msg hidden" id="auth-msg"></span>
+      <span class="auth-err hidden" id="auth-err"></span>
+      <button class="btn-sm" onclick="openSetup()">⚙</button>
+    `;
+    document.getElementById('auth-email-input')
+      .addEventListener('keydown', e => { if (e.key === 'Enter') doSignIn(); });
+  }
+}
+
+async function doSignIn() {
+  const input = document.getElementById('auth-email-input');
+  const msg   = document.getElementById('auth-msg');
+  const err   = document.getElementById('auth-err');
+  if (!input) return;
+  const email = input.value.trim();
+  if (!email) return;
+
+  try {
+    const { error } = await sb.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: window.location.href }
+    });
+    if (error) throw error;
+    msg.textContent = '✉ Magic link sent! Check your email.';
+    msg.classList.remove('hidden');
+    if (err) err.classList.add('hidden');
+  } catch (e) {
+    if (err) { err.textContent = e.message; err.classList.remove('hidden'); }
+  }
+}
+
+async function doSignOut() {
+  if (sb) await sb.auth.signOut();
+}
+
+// ═══════════════════════════════════════════
+//  SETUP MODAL
+// ═══════════════════════════════════════════
+function openSetup() {
+  document.getElementById('setup-modal').classList.remove('hidden');
+  const cfg = getConfig();
+  if (cfg) {
+    document.getElementById('sb-url').value = cfg.url || '';
+    document.getElementById('sb-key').value = cfg.key || '';
+  }
+}
+
+document.getElementById('btn-save-config').addEventListener('click', () => {
+  const url = document.getElementById('sb-url').value.trim();
+  const key = document.getElementById('sb-key').value.trim();
+  const errEl = document.getElementById('setup-error');
+
+  if (!url || !key) {
+    errEl.textContent = 'Both fields are required.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+  if (!url.startsWith('https://')) {
+    errEl.textContent = 'URL must start with https://';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  localStorage.setItem(SB_CONFIG_KEY, JSON.stringify({ url, key }));
+  document.getElementById('setup-modal').classList.add('hidden');
+  errEl.classList.add('hidden');
+  initSupabase(url, key);
+});
+
+// ═══════════════════════════════════════════
+//  LOCAL STATE
+// ═══════════════════════════════════════════
+let state = {};
+try { state = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch {}
+
+function saveLocal() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
-let state = loadState(); // { "p1-w0-t0": true, ... }
+function taskKey(pi, wi, ti) { return `p${pi+1}-w${wi}-t${ti}`; }
 
-function taskKey(phaseIdx, weekIdx, taskIdx) {
-  return `p${phaseIdx+1}-w${weekIdx}-t${taskIdx}`;
-}
-
-// ─────────────────────────────────────────────
-//  STATS HELPERS
-// ─────────────────────────────────────────────
-function phaseStats(phaseIdx) {
-  const phase = PHASES[phaseIdx];
+// ═══════════════════════════════════════════
+//  STATS
+// ═══════════════════════════════════════════
+function phaseStats(pi) {
   let total = 0, done = 0;
-  phase.weeks.forEach((w, wi) => {
-    w.tasks.forEach((_, ti) => {
-      total++;
-      if (state[taskKey(phaseIdx, wi, ti)]) done++;
-    });
+  PHASES[pi].weeks.forEach((w, wi) => {
+    w.tasks.forEach((_, ti) => { total++; if (state[taskKey(pi, wi, ti)]) done++; });
   });
   return { total, done, pct: total ? Math.round(done / total * 100) : 0 };
 }
 
 function overallStats() {
   let total = 0, done = 0;
-  PHASES.forEach((_, pi) => {
-    const s = phaseStats(pi);
-    total += s.total; done += s.done;
-  });
+  PHASES.forEach((_, pi) => { const s = phaseStats(pi); total += s.total; done += s.done; });
   return { total, done, pct: total ? Math.round(done / total * 100) : 0 };
 }
 
-// ─────────────────────────────────────────────
+// ═══════════════════════════════════════════
 //  RENDER
-// ─────────────────────────────────────────────
+// ═══════════════════════════════════════════
 let activePhase = 0;
 
 function buildSidebar() {
   const sidebar = document.getElementById('sidebar');
-  const labelEl = sidebar.querySelector('.sidebar-label');
+  const label   = sidebar.querySelector('.sidebar-label');
   sidebar.innerHTML = '';
-  sidebar.appendChild(labelEl);
-
-  PHASES.forEach((phase, pi) => {
-    const s = phaseStats(pi);
+  sidebar.appendChild(label);
+  PHASES.forEach((ph, pi) => {
+    const s   = phaseStats(pi);
     const tab = document.createElement('div');
     tab.className = 'phase-tab' + (pi === activePhase ? ' active' : '');
-    tab.style.borderLeftColor = pi === activePhase ? phase.color : 'transparent';
+    tab.style.borderLeftColor = pi === activePhase ? ph.color : 'transparent';
     tab.innerHTML = `
-      <span class="phase-dot" style="background:${phase.color}"></span>
-      <span class="phase-tab-text">${phase.icon} ${phase.title.replace('Phase '+( pi+1)+': ','')}</span>
-      <span class="phase-tab-pct">${s.pct}%</span>
-    `;
+      <span class="phase-dot" style="background:${ph.color}"></span>
+      <span class="phase-tab-text">${ph.icon} ${ph.title.replace(`Phase ${pi+1}: `, '')}</span>
+      <span class="phase-tab-pct">${s.pct}%</span>`;
     tab.onclick = () => switchPhase(pi);
     sidebar.appendChild(tab);
   });
@@ -676,85 +847,70 @@ function buildSidebar() {
 function buildMain() {
   const main = document.getElementById('main-content');
   main.innerHTML = '';
-
-  PHASES.forEach((phase, pi) => {
+  PHASES.forEach((ph, pi) => {
+    const s = phaseStats(pi);
     const panel = document.createElement('div');
     panel.className = 'phase-panel' + (pi === activePhase ? ' active' : '');
     panel.id = 'panel-' + pi;
-
-    const s = phaseStats(pi);
-
     panel.innerHTML = `
       <div class="phase-header">
-        <div class="phase-icon">${phase.icon}</div>
+        <div class="phase-icon">${ph.icon}</div>
         <div class="phase-header-info">
-          <div class="phase-title">${phase.title}</div>
-          <div class="phase-meta">${phase.meta}</div>
+          <div class="phase-title">${ph.title}</div>
+          <div class="phase-meta">${ph.meta}</div>
         </div>
         <span class="phase-badge${s.pct === 100 ? ' show' : ''}">✅ COMPLETE</span>
       </div>
-
       <div class="phase-progress">
         <div class="phase-progress-info">
           <div class="pct-label">Phase Progress</div>
           <div class="phase-pct-num" id="pct-num-${pi}">${s.pct}%</div>
         </div>
         <div class="phase-bar-track">
-          <div class="phase-bar-fill" id="phase-fill-${pi}"
-               style="width:${s.pct}%; background:${phase.color}"></div>
+          <div class="phase-bar-fill" id="phase-fill-${pi}" style="width:${s.pct}%;background:${ph.color}"></div>
         </div>
       </div>
-
-      ${phase.weeks.map((week, wi) => buildWeek(phase, pi, week, wi)).join('')}
-
+      ${ph.weeks.map((w, wi) => buildWeek(ph, pi, w, wi)).join('')}
       <div class="cert-card">
-        <div class="cert-icon">${phase.cert.icon}</div>
+        <div class="cert-icon">${ph.cert.icon}</div>
         <div class="cert-info">
-          <div class="cert-name">${phase.cert.name}</div>
-          <div class="cert-meta">${phase.cert.meta}</div>
+          <div class="cert-name">${ph.cert.name}</div>
+          <div class="cert-meta">${ph.cert.meta}</div>
         </div>
-      </div>
-    `;
-
+      </div>`;
     main.appendChild(panel);
   });
 
-  // reattach checkbox listeners
   document.querySelectorAll('input[type="checkbox"]').forEach(cb => {
     cb.addEventListener('change', onCheck);
   });
 
-  // open first week of active phase by default
   const firstWeek = document.querySelector('#panel-' + activePhase + ' .week-section');
   if (firstWeek) firstWeek.classList.add('open');
 }
 
-function buildWeek(phase, pi, week, wi) {
-  const total = week.tasks.length;
-  const done = week.tasks.filter((_, ti) => state[taskKey(pi, wi, ti)]).length;
-  const pct = total ? Math.round(done / total * 100) : 0;
-
-  const tasks = week.tasks.map((task, ti) => {
+function buildWeek(ph, pi, w, wi) {
+  const total = w.tasks.length;
+  const done  = w.tasks.filter((_, ti) => state[taskKey(pi, wi, ti)]).length;
+  const pct   = total ? Math.round(done / total * 100) : 0;
+  const tasks = w.tasks.map((task, ti) => {
     const key = taskKey(pi, wi, ti);
-    const checked = state[key] ? 'checked' : '';
-    const doneClass = state[key] ? 'done' : '';
     return `
-      <div class="task-item ${doneClass}" id="task-${key}">
-        <input type="checkbox" id="cb-${key}" data-key="${key}" ${checked} />
+      <div class="task-item ${state[key] ? 'done' : ''}" id="task-${key}">
+        <input type="checkbox" id="cb-${key}" data-key="${key}" ${state[key] ? 'checked' : ''} />
         <label class="task-label" for="cb-${key}">${task}</label>
       </div>`;
   }).join('');
-
   return `
     <div class="week-section" id="week-${pi}-${wi}">
       <div class="week-header" onclick="toggleWeek(this)">
         <div class="week-header-left">
-          <span class="week-label">${week.label}</span>
+          <span class="week-label">${w.label}</span>
           <span class="week-tasks-count">${done}/${total} tasks</span>
         </div>
-        <div style="display:flex;align-items:center;gap:10px">
+        <div style="display:flex;align-items:center;gap:9px">
           <div class="week-mini-bar">
-            <div class="week-mini-fill" style="width:${pct}%;background:${phase.color}"></div>
+            <div class="week-mini-fill" style="width:${pct}%;background:${ph.color}"></div>
           </div>
           <span class="week-chevron">▼</span>
         </div>
@@ -763,27 +919,23 @@ function buildWeek(phase, pi, week, wi) {
     </div>`;
 }
 
-function toggleWeek(header) {
-  header.closest('.week-section').classList.toggle('open');
-}
+function toggleWeek(header) { header.closest('.week-section').classList.toggle('open'); }
 
 function onCheck(e) {
   const key = e.target.dataset.key;
   state[key] = e.target.checked;
-  saveState(state);
+  saveLocal();
+  pushProgress();  // sync to Supabase (debounced)
 
-  // update task item style
-  const item = document.getElementById('task-' + key);
-  if (item) item.classList.toggle('done', e.target.checked);
+  document.getElementById('task-' + key)?.classList.toggle('done', e.target.checked);
 
-  // update week counts
-  const parts = key.split('-'); // p1, w0, t2
+  const parts = key.split('-');
   const pi = parseInt(parts[0].slice(1)) - 1;
   const wi = parseInt(parts[1].slice(1));
-  const week = PHASES[pi].weeks[wi];
-  const total = week.tasks.length;
-  const done = week.tasks.filter((_, ti) => state[taskKey(pi, wi, ti)]).length;
-  const pct = total ? Math.round(done / total * 100) : 0;
+  const w  = PHASES[pi].weeks[wi];
+  const total = w.tasks.length;
+  const done  = w.tasks.filter((_, ti) => state[taskKey(pi, wi, ti)]).length;
+  const pct   = total ? Math.round(done / total * 100) : 0;
 
   const weekEl = document.getElementById(`week-${pi}-${wi}`);
   if (weekEl) {
@@ -791,26 +943,16 @@ function onCheck(e) {
     weekEl.querySelector('.week-mini-fill').style.width = pct + '%';
   }
 
-  // update phase progress
   updatePhaseProgress(pi);
   updateOverall();
 }
 
 function updatePhaseProgress(pi) {
   const s = phaseStats(pi);
-  const fillEl = document.getElementById('phase-fill-' + pi);
-  const numEl  = document.getElementById('pct-num-' + pi);
-  if (fillEl) fillEl.style.width = s.pct + '%';
-  if (numEl)  numEl.textContent  = s.pct + '%';
-
-  // badge
-  const panel = document.getElementById('panel-' + pi);
-  if (panel) {
-    const badge = panel.querySelector('.phase-badge');
-    if (badge) badge.classList.toggle('show', s.pct === 100);
-  }
-
-  // sidebar tab pct
+  document.getElementById('phase-fill-' + pi) ?.style && (document.getElementById('phase-fill-' + pi).style.width = s.pct + '%');
+  const numEl = document.getElementById('pct-num-' + pi);
+  if (numEl) numEl.textContent = s.pct + '%';
+  document.getElementById('panel-' + pi)?.querySelector('.phase-badge')?.classList.toggle('show', s.pct === 100);
   buildSidebar();
 }
 
@@ -826,18 +968,16 @@ function switchPhase(pi) {
     t.classList.toggle('active', i === pi);
     t.style.borderLeftColor = i === pi ? PHASES[i].color : 'transparent';
   });
-  document.querySelectorAll('.phase-panel').forEach((p, i) => {
-    p.classList.toggle('active', i === pi);
-  });
-  // open first week
-  const firstWeek = document.querySelector('#panel-' + pi + ' .week-section');
-  if (firstWeek && !firstWeek.classList.contains('open')) firstWeek.classList.add('open');
+  document.querySelectorAll('.phase-panel').forEach((p, i) => p.classList.toggle('active', i === pi));
+  const fw = document.querySelector('#panel-' + pi + ' .week-section');
+  if (fw && !fw.classList.contains('open')) fw.classList.add('open');
 }
 
 function resetAll() {
   if (!confirm('Reset ALL progress? This cannot be undone.')) return;
   state = {};
-  saveState(state);
+  saveLocal();
+  pushProgress();
   init();
 }
 
@@ -845,6 +985,18 @@ function init() {
   buildSidebar();
   buildMain();
   updateOverall();
+}
+
+// ═══════════════════════════════════════════
+//  BOOT
+// ═══════════════════════════════════════════
+const cfg = getConfig();
+if (cfg?.url && cfg?.key) {
+  initSupabase(cfg.url, cfg.key);
+} else {
+  // No config yet — show setup modal
+  renderAuthBar();
+  openSetup();
 }
 
 init();
