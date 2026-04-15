@@ -314,43 +314,6 @@
 </head>
 <body>
 
-<!-- ══ SETUP MODAL ══════════════════════════════════════════ -->
-<div class="modal-overlay hidden" id="setup-modal">
-  <div class="modal">
-    <h2>🔧 Connect Supabase</h2>
-    <p>Enter your Supabase project credentials to sync progress across devices. Run the SQL below in your Supabase SQL Editor first.</p>
-
-    <div class="steps">
-      <b>1.</b> Go to <code>supabase.com/dashboard</code> → New Project<br>
-      <b>2.</b> Open <b>SQL Editor</b> and run:<br><br>
-<pre style="background:var(--bg);padding:10px;border-radius:6px;font-size:0.78rem;color:#86efac;overflow-x:auto">
-CREATE TABLE public.progress (
-  user_id UUID REFERENCES auth.users(id)
-    ON DELETE CASCADE PRIMARY KEY,
-  data    JSONB NOT NULL DEFAULT '{}',
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-ALTER TABLE public.progress ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "own_progress" ON public.progress
-  FOR ALL USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
-</pre>
-      <br><b>3.</b> Settings → API → copy <b>Project URL</b> and <b>anon key</b><br>
-      <b>4.</b> Authentication → <b>Email</b> → enable <b>Magic Link</b>
-    </div>
-
-    <div class="form-group">
-      <label>Supabase Project URL</label>
-      <input id="sb-url" type="url" placeholder="https://xxxxxxxxxxxx.supabase.co" />
-    </div>
-    <div class="form-group">
-      <label>Supabase Anon Key</label>
-      <input id="sb-key" type="text" placeholder="eyJhbGciOiJIUzI1NiIs..." />
-    </div>
-    <button class="btn-primary" id="btn-save-config">Connect →</button>
-    <div class="modal-error hidden" id="setup-error"></div>
-  </div>
-</div>
 
 <!-- ══ HEADER ═══════════════════════════════════════════════ -->
 <div class="header">
@@ -620,19 +583,16 @@ const PHASES = [
 ];
 
 // ═══════════════════════════════════════════
-//  SUPABASE CONFIG
+//  SUPABASE CONFIG  (injected by GitHub Actions)
 // ═══════════════════════════════════════════
-const SB_CONFIG_KEY = 'supabase-config';
-const STORAGE_KEY   = 'devsecops-tracker-v1';
+const SUPABASE_URL      = '__SUPABASE_URL__';
+const SUPABASE_ANON_KEY = '__SUPABASE_ANON_KEY__';
+
+const STORAGE_KEY = 'devsecops-tracker-v1';
 
 let sb = null;           // Supabase client
 let currentUser = null;  // logged-in user
 let syncTimer   = null;
-
-function getConfig() {
-  try { return JSON.parse(localStorage.getItem(SB_CONFIG_KEY)) || null; }
-  catch { return null; }
-}
 
 function initSupabase(url, key) {
   sb = window.supabase.createClient(url, key);
@@ -704,19 +664,16 @@ function renderAuthBar() {
   if (!bar) return;
 
   if (!sb) {
-    // Supabase not configured
-    bar.innerHTML = `<button class="btn-sm" onclick="openSetup()">⚙ Connect Supabase</button>`;
+    bar.innerHTML = `<span class="auth-email" style="color:#fca5a5">⚠ Supabase not configured</span>`;
     return;
   }
 
   if (currentUser) {
-    // Signed in
     bar.innerHTML = `
       <span class="auth-email">📧 ${currentUser.email}</span>
       <button class="btn-sm" onclick="doSignOut()">Sign out</button>
     `;
   } else {
-    // Not signed in — show magic link form
     bar.innerHTML = `
       <div class="auth-form">
         <input id="auth-email-input" type="email" placeholder="your@email.com" />
@@ -724,7 +681,6 @@ function renderAuthBar() {
       </div>
       <span class="auth-msg hidden" id="auth-msg"></span>
       <span class="auth-err hidden" id="auth-err"></span>
-      <button class="btn-sm" onclick="openSetup()">⚙</button>
     `;
     document.getElementById('auth-email-input')
       .addEventListener('keydown', e => { if (e.key === 'Enter') doSignIn(); });
@@ -757,39 +713,6 @@ async function doSignOut() {
   if (sb) await sb.auth.signOut();
 }
 
-// ═══════════════════════════════════════════
-//  SETUP MODAL
-// ═══════════════════════════════════════════
-function openSetup() {
-  document.getElementById('setup-modal').classList.remove('hidden');
-  const cfg = getConfig();
-  if (cfg) {
-    document.getElementById('sb-url').value = cfg.url || '';
-    document.getElementById('sb-key').value = cfg.key || '';
-  }
-}
-
-document.getElementById('btn-save-config').addEventListener('click', () => {
-  const url = document.getElementById('sb-url').value.trim();
-  const key = document.getElementById('sb-key').value.trim();
-  const errEl = document.getElementById('setup-error');
-
-  if (!url || !key) {
-    errEl.textContent = 'Both fields are required.';
-    errEl.classList.remove('hidden');
-    return;
-  }
-  if (!url.startsWith('https://')) {
-    errEl.textContent = 'URL must start with https://';
-    errEl.classList.remove('hidden');
-    return;
-  }
-
-  localStorage.setItem(SB_CONFIG_KEY, JSON.stringify({ url, key }));
-  document.getElementById('setup-modal').classList.add('hidden');
-  errEl.classList.add('hidden');
-  initSupabase(url, key);
-});
 
 // ═══════════════════════════════════════════
 //  LOCAL STATE
@@ -990,13 +913,10 @@ function init() {
 // ═══════════════════════════════════════════
 //  BOOT
 // ═══════════════════════════════════════════
-const cfg = getConfig();
-if (cfg?.url && cfg?.key) {
-  initSupabase(cfg.url, cfg.key);
+if (SUPABASE_URL && !SUPABASE_URL.startsWith('__')) {
+  initSupabase(SUPABASE_URL, SUPABASE_ANON_KEY);
 } else {
-  // No config yet — show setup modal
   renderAuthBar();
-  openSetup();
 }
 
 init();
