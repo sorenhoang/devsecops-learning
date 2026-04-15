@@ -50,9 +50,14 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
-          sed -i "s|__SUPABASE_URL__|${SUPABASE_URL}|g" index.html
-          sed -i "s|__SUPABASE_ANON_KEY__|${SUPABASE_ANON_KEY}|g" index.html
+          # Strip any trailing whitespace/newlines from secrets
+          SB_URL=$(echo -n "${SUPABASE_URL}" | tr -d '[:space:]')
+          SB_KEY=$(echo -n "${SUPABASE_ANON_KEY}" | tr -d '[:space:]')
+          sed -i "s|__SUPABASE_URL__|${SB_URL}|g" index.html
+          sed -i "s|__SUPABASE_ANON_KEY__|${SB_KEY}|g" index.html
           echo "✅ Supabase credentials injected"
+          echo "URL length: ${#SB_URL}"
+          echo "Key length: ${#SB_KEY}"
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
