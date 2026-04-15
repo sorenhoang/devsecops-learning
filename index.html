@@ -663,27 +663,28 @@ function renderAuthBar() {
   const bar = document.getElementById('auth-bar');
   if (!bar) return;
 
-  if (!sb) {
-    bar.innerHTML = `<span class="auth-email" style="color:#fca5a5">⚠ Supabase not configured</span>`;
-    return;
-  }
-
   if (currentUser) {
+    // Signed in — show email + sign out
     bar.innerHTML = `
       <span class="auth-email">📧 ${currentUser.email}</span>
       <button class="btn-sm" onclick="doSignOut()">Sign out</button>
     `;
-  } else {
+  } else if (sb) {
+    // Supabase configured but not signed in — show compact sign-in
     bar.innerHTML = `
+      <span class="auth-email" style="color:#94a3b8">Local only</span>
       <div class="auth-form">
-        <input id="auth-email-input" type="email" placeholder="your@email.com" />
-        <button class="btn-sm" onclick="doSignIn()">Send magic link</button>
+        <input id="auth-email-input" type="email" placeholder="Email to sync →" />
+        <button class="btn-sm" onclick="doSignIn()">Send link</button>
       </div>
       <span class="auth-msg hidden" id="auth-msg"></span>
       <span class="auth-err hidden" id="auth-err"></span>
     `;
     document.getElementById('auth-email-input')
       .addEventListener('keydown', e => { if (e.key === 'Enter') doSignIn(); });
+  } else {
+    // Supabase not configured — local mode only, no error shown
+    bar.innerHTML = `<span class="auth-email" style="color:#94a3b8">Local mode</span>`;
   }
 }
 
@@ -911,15 +912,20 @@ function init() {
 }
 
 // ═══════════════════════════════════════════
-//  BOOT
+//  BOOT  — init() always runs, Supabase is optional
 // ═══════════════════════════════════════════
-if (SUPABASE_URL && !SUPABASE_URL.startsWith('__')) {
-  initSupabase(SUPABASE_URL, SUPABASE_ANON_KEY);
-} else {
+try {
+  if (SUPABASE_URL && !SUPABASE_URL.startsWith('__')) {
+    initSupabase(SUPABASE_URL, SUPABASE_ANON_KEY);
+  } else {
+    renderAuthBar();
+  }
+} catch (e) {
+  console.error('Supabase init failed:', e);
   renderAuthBar();
 }
 
-init();
+init(); // always build UI — works with localStorage even without login
 </script>
 </body>
 </html>
