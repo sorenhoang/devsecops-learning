@@ -597,24 +597,18 @@ let syncTimer   = null;
 function initSupabase(url, key) {
   sb = window.supabase.createClient(url, key);
 
+  // onAuthStateChange fires immediately with INITIAL_SESSION on page load
+  // — this is the reliable way to restore an existing session
   sb.auth.onAuthStateChange(async (event, session) => {
-    if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-      currentUser = session.user;
-      await pullProgress();
-      renderAuthBar();
-      init();
-    } else if (event === 'SIGNED_OUT') {
-      currentUser = null;
-      renderAuthBar();
-    }
-  });
+    console.log('[Auth] event:', event, 'user:', session?.user?.email);
 
-  // Restore session on page load
-  sb.auth.getSession().then(({ data: { session } }) => {
-    if (session) {
+    if (session && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION')) {
       currentUser = session.user;
-      pullProgress().then(() => { renderAuthBar(); init(); });
-    } else {
+      renderAuthBar();
+      await pullProgress();
+      init();
+    } else if (!session && (event === 'SIGNED_OUT' || event === 'INITIAL_SESSION')) {
+      currentUser = null;
       renderAuthBar();
     }
   });
