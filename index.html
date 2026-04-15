@@ -640,13 +640,32 @@ function pushProgress() {
   if (!sb || !currentUser) return;
   clearTimeout(syncTimer);
   syncTimer = setTimeout(async () => {
-    const { error } = await sb.from('progress').upsert({
+    const { data, error } = await sb.from('progress').upsert({
       user_id: currentUser.id,
       data: state,
       updated_at: new Date().toISOString()
-    });
-    if (!error) flashSync();
+    }).select();
+    if (error) {
+      console.error('[Supabase] upsert error:', error.message, error);
+      showSyncError(error.message);
+    } else {
+      console.log('[Supabase] synced ok, rows:', data?.length);
+      flashSync();
+    }
   }, 1000);
+}
+
+function showSyncError(msg) {
+  const el = document.getElementById('sync-status');
+  if (!el) return;
+  el.textContent = '⚠ Sync failed';
+  el.style.color = '#f87171';
+  el.classList.add('visible');
+  setTimeout(() => {
+    el.classList.remove('visible');
+    el.style.color = '';
+    el.textContent = 'Synced ✓';
+  }, 4000);
 }
 
 function flashSync() {
